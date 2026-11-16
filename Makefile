@@ -21,7 +21,7 @@ LDFLAGS   := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x \
 all: G29_GTA5_Installer.pkg
 
 # 1. بناء ملف الإضافة البرمجية (PRX) الخاصة بـ GoldHEN بالربط الصحيح
-G29_GTA5.prx: Plugin.c
+G29_GTA5.prx: plugin.c
 	$(CC) $(CFLAGS) -c Plugin.c -o plugin.o
 	$(LD) -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
 		-L$(TOOLCHAIN)/lib $(TOOLCHAIN)/lib/crtlib.o plugin.o \
