@@ -21,6 +21,18 @@ static scePadReadState_t orig_scePadReadState = NULL;
 static uint8_t orig_bytes[16];
 static void *target_func_addr = NULL;
 
+// دالة مساعدة لإرسال الإشعارات بالصيغة الصحيحة لبيئة OpenOrbis
+static void sendNotification(const char *msg) {
+    OrbisNotificationRequest req;
+    memset(&req, 0, sizeof(OrbisNotificationRequest));
+    req.type = 0;
+    req.unk3 = 0;
+    req.useIconImageUri = 0;
+    req.targetId = -1;
+    strncpy(req.message, msg, sizeof(req.message) - 1);
+    sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+}
+
 // ============================================================================
 // 2. دوال معالجة إشارات الدركسون والدواسات
 // ============================================================================
@@ -62,7 +74,6 @@ static void applyG29Remapping(OrbisPadData *data) {
     }
 
     // د) تحسين استجابة أزرار المقود (الهاندبريك / البوري / الكاميرا)
-    // زر الدائرة (Circle) أو R1 خلف المقود يعمل كهاندبريك (فرامل يد) في GTA V
     if (data->buttons & ORBIS_PAD_BUTTON_R1) {
         data->buttons |= ORBIS_PAD_BUTTON_R1;
     }
@@ -131,9 +142,9 @@ static int installPadHook(void) {
 int module_start(size_t argc, const void *args) {
     int status = installPadHook();
     if (status == 0) {
-        sceKernelSendNotificationRequest(0, "G29 Wheel Active! Enjoy GTA V.", 0, 0, 0);
+        sendNotification("G29 Wheel Active! Enjoy GTA V.");
     } else {
-        sceKernelSendNotificationRequest(0, "G29 Hook Error! Check GoldHEN.", 0, 0, 0);
+        sendNotification("G29 Hook Error! Check GoldHEN.");
     }
     return 0;
 }
