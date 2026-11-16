@@ -36,30 +36,27 @@ eboot.bin: installer_main.c
 
 # 3. تجهيز ملفات النظام الخاصة بالـ PKG (param.sfo)
 param.sfo:
-	$(PKG_TOOL) sfo_new param.sfo
-	$(PKG_TOOL) sfo_setentry param.sfo APP_TYPE --type Integer --maxsize 4 --value 1
-	$(PKG_TOOL) sfo_setentry param.sfo APP_VER --type Utf8 --maxsize 8 --value $(VERSION)
-	$(PKG_TOOL) sfo_setentry param.sfo ATTRIBUTE --type Integer --maxsize 4 --value 0
-	$(PKG_TOOL) sfo_setentry param.sfo CATEGORY --type Utf8 --maxsize 4 --value "gd"
-	$(PKG_TOOL) sfo_setentry param.sfo CONTENT_ID --type Utf8 --maxsize 48 --value "IV0000-$(TITLE_ID)_00-G29WHEELENABLER0"
-	$(PKG_TOOL) sfo_setentry param.sfo DOWNLOAD_DATA_SIZE --type Integer --maxsize 4 --value 0
-	$(PKG_TOOL) sfo_setentry param.sfo SYSTEM_VER --type Integer --maxsize 4 --value 0
-	$(PKG_TOOL) sfo_setentry param.sfo TITLE --type Utf8 --maxsize 128 --value "$(TITLE)"
-	$(PKG_TOOL) sfo_setentry param.sfo TITLE_ID --type Utf8 --maxsize 12 --value "$(TITLE_ID)"
-	$(PKG_TOOL) sfo_setentry param.sfo VERSION --type Utf8 --maxsize 8 --value $(VERSION)
+	mkdir -p sce_sys
+	$(PKG_TOOL) sfo_new sce_sys/param.sfo
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo APP_TYPE --type Integer --maxsize 4 --value 1
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo APP_VER --type Utf8 --maxsize 8 --value $(VERSION)
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo ATTRIBUTE --type Integer --maxsize 4 --value 0
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo CATEGORY --type Utf8 --maxsize 4 --value "gd"
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo CONTENT_ID --type Utf8 --maxsize 48 --value "IV0000-$(TITLE_ID)_00-G29WHEELENABLER0"
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo DOWNLOAD_DATA_SIZE --type Integer --maxsize 4 --value 0
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo SYSTEM_VER --type Integer --maxsize 4 --value 0
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo TITLE --type Utf8 --maxsize 128 --value "$(TITLE)"
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo TITLE_ID --type Utf8 --maxsize 12 --value "$(TITLE_ID)"
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo VERSION --type Utf8 --maxsize 8 --value $(VERSION)
 
-# 4. تغليف كل شيء داخل ملف PKG النهائي بالمسارات الدقيقة
+# 4. تغليف كل شيء داخل ملف PKG النهائي في الجذر مباشرة
 G29_GTA5_Installer.pkg: G29_GTA5.prx eboot.bin param.sfo
-	mkdir -p pkg_build/sce_sys
-	cp eboot.bin pkg_build/
-	cp G29_GTA5.prx pkg_build/
-	cp param.sfo pkg_build/sce_sys/
-	$(PKG_TOOL) gp4_proj_create --volume_type pkg_ps4_app --content_id "IV0000-$(TITLE_ID)_00-G29WHEELENABLER0" --passcode 00000000000000000000000000000000 pkg_build/project.gp4
-	$(PKG_TOOL) gp4_file_add pkg_build/project.gp4 pkg_build/eboot.bin eboot.bin
-	$(PKG_TOOL) gp4_file_add pkg_build/project.gp4 pkg_build/G29_GTA5.prx G29_GTA5.prx
-	$(PKG_TOOL) gp4_file_add pkg_build/project.gp4 pkg_build/sce_sys/param.sfo sce_sys/param.sfo
-	$(PKG_TOOL) pkg_build pkg_build/project.gp4 .
-	mv *.pkg G29_GTA5_Installer.pkg
+	$(PKG_TOOL) gp4_proj_create --volume_type pkg_ps4_app --content_id "IV0000-$(TITLE_ID)_00-G29WHEELENABLER0" --passcode 00000000000000000000000000000000 project.gp4
+	$(PKG_TOOL) gp4_file_add project.gp4 eboot.bin eboot.bin
+	$(PKG_TOOL) gp4_file_add project.gp4 G29_GTA5.prx G29_GTA5.prx
+	$(PKG_TOOL) gp4_file_add project.gp4 sce_sys/param.sfo sce_sys/param.sfo
+	$(PKG_TOOL) pkg_build project.gp4 .
+	mv IV0000-$(TITLE_ID)_00-G29WHEELENABLER0.pkg G29_GTA5_Installer.pkg
 
 clean:
-	rm -rf *.o *.elf *.prx eboot.bin param.sfo pkg_build *.pkg
+	rm -rf *.o *.elf *.prx eboot.bin sce_sys project.gp4 *.pkg
