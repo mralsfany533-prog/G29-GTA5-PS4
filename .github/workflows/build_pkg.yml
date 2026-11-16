@@ -16,17 +16,12 @@ jobs:
       - name: 2. تثبيت المتطلبات الأساسية
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld make wget jq dotnet-runtime-6.0
+          sudo apt-get install -y clang lld make wget unzip dotnet-runtime-6.0
 
       - name: 3. تحميل وتجهيز بيئة OpenOrbis PS4 Toolchain
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          ASSET_URL=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/tags/v0.5.3 | jq -r '.assets[] | select(.name | test("linux|tar\\.gz|zip"; "i")) | .browser_download_url' | head -n 1)
-          echo "Downloading: $ASSET_URL"
-          wget -q "$ASSET_URL" -O toolchain_pkg
-          mkdir -p $HOME/OpenOrbis
-          tar -xzf toolchain_pkg -C $HOME/OpenOrbis || unzip -q toolchain_pkg -d $HOME/OpenOrbis
+          wget -q https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.3/OpenOrbis-PS4-Toolchain-v0.5.3-Linux.zip -O openorbis.zip
+          unzip -q openorbis.zip -d $HOME/OpenOrbis
           chmod +x $HOME/OpenOrbis/bin/linux/*
 
       - name: 4. ترجمة الكود وبناء ملف PKG
