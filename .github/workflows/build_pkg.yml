@@ -13,15 +13,17 @@ jobs:
       - name: 1. جلب ملفات المشروع
         uses: actions/checkout@v4
 
-      - name: 2. تثبيت المتطلبات الأساسية (Clang & LLD & .NET)
+      - name: 2. تثبيت المتطلبات الأساسية
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld make wget unzip dotnet-runtime-6.0
+          sudo apt-get install -y clang lld make wget unzip jq dotnet-runtime-6.0
 
       - name: 3. تحميل وتجهيز بيئة OpenOrbis PS4 Toolchain
         run: |
-          wget -q https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.3/OpenOrbis-PS4-Toolchain-v0.5.3-Linux.zip
-          unzip -q OpenOrbis-PS4-Toolchain-v0.5.3-Linux.zip -d $HOME/OpenOrbis
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest | jq -r '.assets[] | select(.name | test("Linux|Toolchain.*\\.zip$"; "i")) | .browser_download_url' | head -n 1)
+          echo "Downloading from: $DOWNLOAD_URL"
+          wget -q "$DOWNLOAD_URL" -O toolchain.zip
+          unzip -q toolchain.zip -d $HOME/OpenOrbis
           chmod +x $HOME/OpenOrbis/bin/linux/*
 
       - name: 4. ترجمة الكود وبناء ملف PKG
