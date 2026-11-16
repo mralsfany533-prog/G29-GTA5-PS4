@@ -16,14 +16,21 @@ jobs:
       - name: 2. تثبيت المتطلبات الأساسية
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld make wget unzip dotnet-runtime-6.0
+          sudo apt-get install -y clang lld make wget unzip tar jq dotnet-runtime-6.0
 
       - name: 3. تحميل وتجهيز بيئة OpenOrbis PS4 Toolchain
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest | grep "browser_download_url.*zip" | cut -d '"' -f 4 | head -n 1)
-          wget -O openorbis.zip "$DOWNLOAD_URL"
+          DOWNLOAD_URL=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases | jq -r '.[0].assets[] | select(.name | test("linux|tar|zip"; "i")) | .browser_download_url' | head -n 1)
+          echo "Downloading from: $DOWNLOAD_URL"
+          wget -O openorbis_archive "$DOWNLOAD_URL"
           mkdir -p $HOME/OpenOrbis
-          unzip -q openorbis.zip -d $HOME/OpenOrbis
+          if file openorbis_archive | grep -q "Zip"; then
+            unzip -q openorbis_archive -d $HOME/OpenOrbis
+          else
+            tar -xzf openorbis_archive -C $HOME/OpenOrbis
+          fi
           TOOLCHAIN_DIR=$(find $HOME/OpenOrbis -type d -name "bin" -exec dirname {} \; | head -n 1)
           echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN_DIR" >> $GITHUB_ENV
           chmod +x "$TOOLCHAIN_DIR/bin/linux/"*
