@@ -20,7 +20,8 @@ jobs:
 
       - name: 3. تحميل وتجهيز بيئة OpenOrbis PS4 Toolchain
         run: |
-          wget -O openorbis.zip "https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/download/v0.5.3/OpenOrbis-PS4-Toolchain-v0.5.3.zip"
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest | grep "browser_download_url.*zip" | cut -d '"' -f 4 | head -n 1)
+          wget -O openorbis.zip "$DOWNLOAD_URL"
           mkdir -p $HOME/OpenOrbis
           unzip -q openorbis.zip -d $HOME/OpenOrbis
           TOOLCHAIN_DIR=$(find $HOME/OpenOrbis -type d -name "bin" -exec dirname {} \; | head -n 1)
