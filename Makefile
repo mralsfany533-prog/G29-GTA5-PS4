@@ -28,11 +28,11 @@ G29_GTA5.prx: plugin.c
 		-lkernel -lc -lScePad -o G29_GTA5.elf
 	$(TOOLCHAIN)/bin/linux/create-fself -in=G29_GTA5.elf --out=G29_GTA5.prx --lib=G29_GTA5.prx
 
-# 2. بناء الملف التنفيذي لتطبيق التثبيت (eboot.bin)
+# 2. بناء الملف التنفيذي لتطبيق التثبيت (eboot.bin) بالمعامل الصحيح --eboot
 eboot.bin: installer_main.c
 	$(CC) $(CFLAGS) -c installer_main.c -o installer.o
 	$(LD) $(LDFLAGS) $(TOOLCHAIN)/lib/crt1.o installer.o -o installer.elf
-	$(TOOLCHAIN)/bin/linux/create-fself -in=installer.elf --out=eboot.bin --paid 0x3800000000000011
+	$(TOOLCHAIN)/bin/linux/create-fself -in=installer.elf --eboot=eboot.bin --paid 0x3800000000000011
 
 # 3. تجهيز ملفات النظام الخاصة بالـ PKG (param.sfo و gp4)
 param.sfo:
