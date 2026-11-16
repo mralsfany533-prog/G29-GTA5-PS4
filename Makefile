@@ -1,15 +1,18 @@
+# إعدادات المترجم وبيئة OpenOrbis
 TOOLCHAIN := $(OO_PS4_TOOLCHAIN)
 CC        := clang
 LD        := ld.lld
 PKG_TOOL  := $(TOOLCHAIN)/bin/linux/PkgTool.Core
 
+# معرف التطبيق الخاص بالمثبّت (Title ID)
 TITLE_ID  := G29GTA501
 TITLE     := G29 GTA5 Wheel Enabler
 VERSION   := 01.00
 
+# إعدادات الترجمة المشتركة
 CFLAGS    := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
              -I$(TOOLCHAIN)/include -I$(TOOLCHAIN)/include/orbis \
-             -D__PS4__ -D_BSD_SOURCE -O2 -Wall
+             -D__PS4__ -O2 -Wall
 
 LDFLAGS   := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x \
              --eh-frame-hdr -L$(TOOLCHAIN)/lib \
@@ -17,17 +20,21 @@ LDFLAGS   := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x \
 
 all: G29_GTA5_Installer.pkg
 
-G29_GTA5.prx: plugin.c
-	$(CC) $(CFLAGS) -c plugin.c -o plugin.o
-	$(LD) -m elf_x86_64 -shared --eh-frame-hdr -L$(TOOLCHAIN)/lib \
-		-lkernel -lc -lScePad plugin.o -o G29_GTA5.elf
+# 1. بناء ملف الإضافة البرمجية (PRX) الخاصة بـ GoldHEN بالربط الصحيح
+G29_GTA5.prx: Plugin.c
+	$(CC) $(CFLAGS) -c Plugin.c -o plugin.o
+	$(LD) -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
+		-L$(TOOLCHAIN)/lib $(TOOLCHAIN)/lib/crtlib.o plugin.o \
+		-lkernel -lc -lScePad -o G29_GTA5.elf
 	$(TOOLCHAIN)/bin/linux/create-fself -in=G29_GTA5.elf --out=G29_GTA5.prx --lib=G29_GTA5.prx
 
+# 2. بناء الملف التنفيذي لتطبيق التثبيت (eboot.bin)
 eboot.bin: installer_main.c
 	$(CC) $(CFLAGS) -c installer_main.c -o installer.o
 	$(LD) $(LDFLAGS) $(TOOLCHAIN)/lib/crt1.o installer.o -o installer.elf
 	$(TOOLCHAIN)/bin/linux/create-fself -in=installer.elf --out=eboot.bin --paid 0x3800000000000011
 
+# 3. تجهيز ملفات النظام الخاصة بالـ PKG (param.sfo و gp4)
 param.sfo:
 	$(PKG_TOOL) sfo_new param.sfo
 	$(PKG_TOOL) sfo_setentry param.sfo APP_TYPE --type Integer --maxsize 4 --value 1
@@ -41,6 +48,7 @@ param.sfo:
 	$(PKG_TOOL) sfo_setentry param.sfo TITLE_ID --type Utf8 --maxsize 12 --value "$(TITLE_ID)"
 	$(PKG_TOOL) sfo_setentry param.sfo VERSION --type Utf8 --maxsize 8 --value $(VERSION)
 
+# 4. تغليف كل شيء داخل ملف PKG النهائي
 G29_GTA5_Installer.pkg: G29_GTA5.prx eboot.bin param.sfo
 	mkdir -p pkg_build/sce_sys
 	cp eboot.bin pkg_build/
