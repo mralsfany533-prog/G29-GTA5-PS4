@@ -8,6 +8,7 @@ PKG_TOOL  := $(TOOLCHAIN)/bin/linux/PkgTool.Core
 TITLE_ID  := G29GTA501
 TITLE     := G29 GTA5 Wheel Enabler
 VERSION   := 01.00
+CONTENT_ID := IV0000-$(TITLE_ID)_00-G29WHEELENABLER0
 
 # إعدادات الترجمة المشتركة
 CFLAGS    := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
@@ -42,21 +43,42 @@ param.sfo:
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo APP_VER --type Utf8 --maxsize 8 --value $(VERSION)
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo ATTRIBUTE --type Integer --maxsize 4 --value 0
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo CATEGORY --type Utf8 --maxsize 4 --value "gd"
-	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo CONTENT_ID --type Utf8 --maxsize 48 --value "IV0000-$(TITLE_ID)_00-G29WHEELENABLER0"
+	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo CONTENT_ID --type Utf8 --maxsize 48 --value "$(CONTENT_ID)"
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo DOWNLOAD_DATA_SIZE --type Integer --maxsize 4 --value 0
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo SYSTEM_VER --type Integer --maxsize 4 --value 0
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo TITLE --type Utf8 --maxsize 128 --value "$(TITLE)"
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo TITLE_ID --type Utf8 --maxsize 12 --value "$(TITLE_ID)"
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo VERSION --type Utf8 --maxsize 8 --value $(VERSION)
 
-# 4. تغليف كل شيء داخل ملف PKG النهائي في الجذر مباشرة
+# 4. توليد project.gp4 مباشرة وبناء ملف PKG النهائي
 G29_GTA5_Installer.pkg: G29_GTA5.prx eboot.bin param.sfo
-	$(PKG_TOOL) gp4_proj_create --volume_type pkg_ps4_app --content_id "IV0000-$(TITLE_ID)_00-G29WHEELENABLER0" --passcode 00000000000000000000000000000000 project.gp4
-	$(PKG_TOOL) gp4_file_add project.gp4 eboot.bin eboot.bin
-	$(PKG_TOOL) gp4_file_add project.gp4 G29_GTA5.prx G29_GTA5.prx
-	$(PKG_TOOL) gp4_file_add project.gp4 sce_sys/param.sfo sce_sys/param.sfo
+	printf '<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n' > project.gp4
+	printf '<psproject fmt="gp4" version="1000">\n' >> project.gp4
+	printf '  <volume>\n' >> project.gp4
+	printf '    <volume_type>pkg_ps4_app</volume_type>\n' >> project.gp4
+	printf '    <volume_id>PS4VOLUME</volume_id>\n' >> project.gp4
+	printf '    <volume_ts>2026-01-01 00:00:00</volume_ts>\n' >> project.gp4
+	printf '    <package content_id="$(CONTENT_ID)" passcode="00000000000000000000000000000000" storage_type="digital50" app_type="full"/>\n' >> project.gp4
+	printf '    <chunk_info chunk_count="1" scenario_count="1">\n' >> project.gp4
+	printf '      <chunks>\n' >> project.gp4
+	printf '        <chunk id="0" layer_no="0" label="Chunk #0"/>\n' >> project.gp4
+	printf '      </chunks>\n' >> project.gp4
+	printf '      <scenarios default_id="0">\n' >> project.gp4
+	printf '        <scenario id="0" type="sp" initial_chunk_count="1" label="Scenario #0">0</scenario>\n' >> project.gp4
+	printf '      </scenarios>\n' >> project.gp4
+	printf '    </chunk_info>\n' >> project.gp4
+	printf '  </volume>\n' >> project.gp4
+	printf '  <files img_no="0">\n' >> project.gp4
+	printf '    <file targ_path="sce_sys/param.sfo" orig_path="sce_sys/param.sfo"/>\n' >> project.gp4
+	printf '    <file targ_path="eboot.bin" orig_path="eboot.bin"/>\n' >> project.gp4
+	printf '    <file targ_path="G29_GTA5.prx" orig_path="G29_GTA5.prx"/>\n' >> project.gp4
+	printf '  </files>\n' >> project.gp4
+	printf '  <rootdir>\n' >> project.gp4
+	printf '    <dir targ_name="sce_sys"/>\n' >> project.gp4
+	printf '  </rootdir>\n' >> project.gp4
+	printf '</psproject>\n' >> project.gp4
 	$(PKG_TOOL) pkg_build project.gp4 .
-	mv IV0000-$(TITLE_ID)_00-G29WHEELENABLER0.pkg G29_GTA5_Installer.pkg
+	mv $(CONTENT_ID).pkg G29_GTA5_Installer.pkg
 
 clean:
 	rm -rf *.o *.elf *.prx eboot.bin sce_sys project.gp4 *.pkg
