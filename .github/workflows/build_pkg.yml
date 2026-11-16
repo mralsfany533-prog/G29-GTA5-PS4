@@ -8,31 +8,18 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    container:
+      image: openorbis/ps4-toolchain:latest
 
     steps:
       - name: 1. جلب ملفات المشروع
         uses: actions/checkout@v4
 
-      - name: 2. تثبيت المتطلبات الأساسية
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang lld make wget unzip jq dotnet-runtime-6.0
-
-      - name: 3. تحميل وتجهيز بيئة OpenOrbis PS4 Toolchain
-        run: |
-          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest | jq -r '.assets[] | select(.name | test("Linux|Toolchain.*\\.zip$"; "i")) | .browser_download_url' | head -n 1)
-          echo "Downloading from: $DOWNLOAD_URL"
-          wget -q "$DOWNLOAD_URL" -O toolchain.zip
-          unzip -q toolchain.zip -d $HOME/OpenOrbis
-          chmod +x $HOME/OpenOrbis/bin/linux/*
-
-      - name: 4. ترجمة الكود وبناء ملف PKG
-        env:
-          OO_PS4_TOOLCHAIN: ${{ runner.home }}/OpenOrbis
+      - name: 2. ترجمة الكود وبناء ملف PKG
         run: |
           make
 
-      - name: 5. رفع ملف PKG النهائي للتحميل
+      - name: 3. رفع ملف PKG النهائي للتحميل
         uses: actions/upload-artifact@v4
         with:
           name: G29_GTA5_Installer_PKG
