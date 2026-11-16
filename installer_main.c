@@ -5,6 +5,17 @@
 #include <orbis/libkernel.h>
 #include <orbis/Sysmodule.h>
 
+static void sendNotification(const char *msg) {
+    OrbisNotificationRequest req;
+    memset(&req, 0, sizeof(OrbisNotificationRequest));
+    req.type = 0;
+    req.unk3 = 0;
+    req.useIconImageUri = 0;
+    req.targetId = -1;
+    strncpy(req.message, msg, sizeof(req.message) - 1);
+    sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
+}
+
 void copyFile(const char *src, const char *dst) {
     FILE *in = fopen(src, "rb");
     if (!in) return;
@@ -37,6 +48,6 @@ int main(void) {
     }
 
     // 3. إرسال إشعار على شاشة PS4 بنجاح التثبيت
-    sceKernelSendNotificationRequest(0, "G29 GTA5 Plugin Installed! Restart Game.", 0, 0, 0);
+    sendNotification("G29 GTA5 Plugin Installed! Restart Game.");
     return 0;
 }
