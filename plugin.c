@@ -13,15 +13,13 @@
 #define STEERING_GAIN       1.65f   // تضخيم التفاف المقود ليناسب زاوية GTA V
 #define PEDAL_THRESHOLD     12      // حساسية بداية الضغط على الدواسات
 
-// مؤشر لتخزين عنوان الدالة الأصلية في النظام
 typedef int (*scePadReadState_t)(int32_t handle, OrbisPadData *data);
 static scePadReadState_t orig_scePadReadState = NULL;
 
-// مصفوفة لحفظ البايتات الأصلية للدالة قبل تعديلها (Trampoline)
 static uint8_t orig_bytes[16];
 static void *target_func_addr = NULL;
+static int hook_installed = 0;
 
-// دالة مساعدة لإرسال الإشعارات بالصيغة الصحيحة لبيئة OpenOrbis
 static void sendNotification(const char *msg) {
     OrbisNotificationRequest req;
     memset(&req, 0, sizeof(OrbisNotificationRequest));
@@ -39,7 +37,7 @@ static void sendNotification(const char *msg) {
 static inline uint8_t processSteering(uint8_t rawX) {
     int offset = (int)rawX - 128;
     if (abs(offset) < STEERING_DEADZONE) {
-        return 128; // منتصف المقود تماماً
+        return 128;
     }
 
     int scaled = 128 + (int)(offset * STEERING_GAIN);
@@ -54,7 +52,7 @@ static void applyG29Remapping(OrbisPadData *data) {
     // أ) تحويل التفاف المقود إلى حركة عصا التحكم اليسرى (Left Stick X)
     data->leftStick.x = processSteering(data->leftStick.x);
 
-    // ب) تثبيت المحور العمودي للعصا اليسرى لمنع ميلان الدراجات أو الكاميرا بالخطأ
+    // ب) تثبيت المحور العمودي للعصا اليسرى لمنع ميلان الدراجات بالخطأ
     if (abs((int)data->leftStick.y - 128) < 15) {
         data->leftStick.y = 128;
     }
@@ -70,11 +68,6 @@ static void applyG29Remapping(OrbisPadData *data) {
         data->buttons |= ORBIS_PAD_BUTTON_L2;
     } else {
         data->buttons &= ~ORBIS_PAD_BUTTON_L2;
-    }
-
-    // د) تحسين استجابة أزرار المقود
-    if (data->buttons & ORBIS_PAD_BUTTON_R1) {
-        data->buttons |= ORBIS_PAD_BUTTON_R1;
     }
 }
 
@@ -103,6 +96,8 @@ int hooked_scePadReadState(int32_t handle, OrbisPadData *data) {
 // 4. تثبيت الربط العميق في الذاكرة (Inline Hook Setup)
 // ============================================================================
 static int installPadHook(void) {
+    if (hook_installed) return 0;
+
     int padLibHandle = sceKernelLoadStartModule("libScePad.sprx", 0, NULL, 0, NULL, NULL);
     if (padLibHandle < 0) return -1;
 
@@ -126,14 +121,23 @@ static int installPadHook(void) {
     *(uint64_t *)(jump + 6) = (uint64_t)hooked_scePadReadState;
     memcpy(target_func_addr, jump, 14);
 
+    hook_installed = 1;
     return 0;
 }
 
+static void uninstallPadHook(void) {
+    if (hook_installed && target_func_addr && orig_bytes[0] != 0) {
+        memcpy(target_func_addr, orig_bytes, 14);
+        hook_installed = 0;
+    }
+}
+
 // ============================================================================
-// 5. نقطة بداية ونهاية الإضافة المتوافقة مع crtlib.o في OpenOrbis
+// 5. نقاط الدخول الرسمية المتوافقة مع GoldHEN و crtlib.o
 // ============================================================================
 __attribute__((constructor))
 static void on_plugin_load(void) {
+    sceKernelUsleep(500000); // انتظار نصف ثانية حتى تكتمل تهيئة اللعبة
     int status = installPadHook();
     if (status == 0) {
         sendNotification("G29 Wheel Active! Enjoy GTA V.");
@@ -144,7 +148,16 @@ static void on_plugin_load(void) {
 
 __attribute__((destructor))
 static void on_plugin_unload(void) {
-    if (target_func_addr && orig_bytes[0] != 0) {
-        memcpy(target_func_addr, orig_bytes, 14);
-    }
+    uninstallPadHook();
+}
+
+// تصدير الدوال القياسية لنظام PS4 لضمان تعرف GoldHEN عليها
+int module_start(size_t argc, const void *args) {
+    on_plugin_load();
+    return 0;
+}
+
+int module_stop(size_t argc, const void *args) {
+    on_plugin_unload();
+    return 0;
 }
