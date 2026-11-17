@@ -133,7 +133,7 @@ static void uninstallPadHook(void) {
 }
 
 // ============================================================================
-// 5. نقاط الدخول الرسمية المتوافقة مع GoldHEN و crtlib.o
+// 5. نقاط الدخول التلقائية عبر Constructor
 // ============================================================================
 __attribute__((constructor))
 static void on_plugin_load(void) {
@@ -149,15 +149,4 @@ static void on_plugin_load(void) {
 __attribute__((destructor))
 static void on_plugin_unload(void) {
     uninstallPadHook();
-}
-
-// تصدير الدوال القياسية لنظام PS4 لضمان تعرف GoldHEN عليها
-int module_start(size_t argc, const void *args) {
-    on_plugin_load();
-    return 0;
-}
-
-int module_stop(size_t argc, const void *args) {
-    on_plugin_unload();
-    return 0;
 }
