@@ -35,53 +35,18 @@ jobs:
           echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN_DIR" >> $GITHUB_ENV
           chmod +x "$TOOLCHAIN_DIR/bin/linux/"*
 
-      - name: 4. ترجمة الكود وبناء ملف PKG
+      - name: 4. ترجمة الكود وبناء الإضافة وملف PKG
         run: |
           make
 
-      name: Build PS4 G29 PKG
-
-on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: 1. جلب ملفات المشروع
-        uses: actions/checkout@v4
-
-      - name: 2. تثبيت المتطلبات الأساسية
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang lld make wget unzip tar jq dotnet-runtime-6.0
-
-      - name: 3. تحميل وتجهيز بيئة OpenOrbis PS4 Toolchain
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          DOWNLOAD_URL=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases | jq -r '.[0].assets[] | select(.name | test("linux|tar|zip"; "i")) | .browser_download_url' | head -n 1)
-          echo "Downloading from: $DOWNLOAD_URL"
-          wget -O openorbis_archive "$DOWNLOAD_URL"
-          mkdir -p $HOME/OpenOrbis
-          if file openorbis_archive | grep -q "Zip"; then
-            unzip -q openorbis_archive -d $HOME/OpenOrbis
-          else
-            tar -xzf openorbis_archive -C $HOME/OpenOrbis
-          fi
-          TOOLCHAIN_DIR=$(find $HOME/OpenOrbis -type d -name "bin" -exec dirname {} \; | head -n 1)
-          echo "OO_PS4_TOOLCHAIN=$TOOLCHAIN_DIR" >> $GITHUB_ENV
-          chmod +x "$TOOLCHAIN_DIR/bin/linux/"*
-
-      - name: 4. ترجمة الكود وبناء ملف PKG
-        run: |
-          make
-
-      - name: رفع ملف الإضافة PRX للتحميل المباشر
+      - name: 5. رفع ملف الإضافة PRX للتحميل المباشر
         uses: actions/upload-artifact@v4
         with:
           name: G29_GTA5_Plugin_PRX
           path: G29_GTA5.prx
+
+      - name: 6. رفع ملف PKG للتحميل
+        uses: actions/upload-artifact@v4
+        with:
+          name: G29_GTA5_Installer_PKG
+          path: G29_GTA5_Installer.pkg
