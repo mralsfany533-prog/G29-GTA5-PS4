@@ -7,18 +7,6 @@
 #include <orbis/libkernel.h>
 #include <orbis/Pad.h>
 
-// تعريف ترويسة الموديول القياسية لنظام PS4 لكي يقبلها GoldHEN
-__asm__(
-    ".intel_syntax noprefix\n"
-    ".align 0x8\n"
-    ".section \".data.sce_module_param\"\n"
-    "_sceProcessParam:\n"
-    "    .quad 0x18\n"
-    "    .quad 0x1337\n"
-    "    .quad 0x4508101\n"
-    ".att_syntax prefix\n"
-);
-
 #define STEERING_DEADZONE   4
 #define STEERING_GAIN       1.65f
 #define PEDAL_THRESHOLD     12
@@ -100,9 +88,8 @@ static int installPadHook(void) {
     return 0;
 }
 
-// تشغيل الربط في خيط مستقل حتى لا يوقف تحميل اللعبة
 static void *init_thread(void *arg) {
-    sceKernelUsleep(1000000); // انتظار ثانية واحدة بعد إقلاع اللعبة
+    sceKernelUsleep(1000000);
     int status = installPadHook();
     if (status == 0) {
         sendNotification("G29 Wheel Active! Enjoy GTA V.");
@@ -114,17 +101,17 @@ static void *init_thread(void *arg) {
     return NULL;
 }
 
-int module_start(size_t argc, const void *args) {
+__attribute__((constructor))
+static void on_plugin_load(void) {
     pthread_t th;
     pthread_create(&th, NULL, init_thread, NULL);
     pthread_detach(th);
-    return 0;
 }
 
-int module_stop(size_t argc, const void *args) {
+__attribute__((destructor))
+static void on_plugin_unload(void) {
     if (hook_installed && target_func_addr && orig_bytes[0] != 0) {
         memcpy(target_func_addr, orig_bytes, 14);
         hook_installed = 0;
     }
-    return 0;
 }
