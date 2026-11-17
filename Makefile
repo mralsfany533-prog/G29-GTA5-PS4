@@ -4,13 +4,11 @@ CC        := clang
 LD        := ld.lld
 PKG_TOOL  := $(TOOLCHAIN)/bin/linux/PkgTool.Core
 
-# معرف التطبيق الخاص بالمثبّت (Title ID)
-TITLE_ID  := G29GTA501
-TITLE     := G29 GTA5 Wheel Enabler
-VERSION   := 01.00
+TITLE_ID   := G29GTA501
+TITLE      := G29 GTA5 Wheel Enabler
+VERSION    := 01.00
 CONTENT_ID := IV0000-$(TITLE_ID)_00-G29WHEELENABLER0
 
-# إعدادات الترجمة المشتركة
 CFLAGS    := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables \
              -I$(TOOLCHAIN)/include -I$(TOOLCHAIN)/include/orbis \
              -D__PS4__ -O2 -Wall
@@ -19,21 +17,23 @@ LDFLAGS   := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x \
              --eh-frame-hdr -L$(TOOLCHAIN)/lib \
              -lkernel -lc -lc++ -lSceUserService -lScePad -lSceSysmodule
 
-all: G29_GTA5_Installer.pkg
+all: G29_GTA5.prx G29_GTA5_Installer.pkg
 
-# 1. بناء ملف الإضافة البرمجية (PRX) الخاصة بـ GoldHEN
+# 1. بناء ملف الإضافة البرمجية (PRX) الخاصة بـ GoldHEN بالبنية والتوقيع الصحيحين
 G29_GTA5.prx: plugin.c
 	$(CC) $(CFLAGS) -c plugin.c -o plugin.o
 	$(LD) -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
 		-L$(TOOLCHAIN)/lib $(TOOLCHAIN)/lib/crtlib.o plugin.o \
 		-lkernel -lc -lScePad -o G29_GTA5.elf
-	$(TOOLCHAIN)/bin/linux/create-fself -in=G29_GTA5.elf --out=G29_GTA5.prx --lib=G29_GTA5.prx
+	$(TOOLCHAIN)/bin/linux/create-fself -in=G29_GTA5.elf --out=G29_GTA5.prx --lib=G29_GTA5.prx --paid 0x3800000000000011
+	test -s G29_GTA5.prx
 
 # 2. بناء الملف التنفيذي لتطبيق التثبيت (eboot.bin)
 eboot.bin: installer_main.c
 	$(CC) $(CFLAGS) -c installer_main.c -o installer.o
 	$(LD) $(LDFLAGS) $(TOOLCHAIN)/lib/crt1.o installer.o -o installer.elf
 	$(TOOLCHAIN)/bin/linux/create-fself -in=installer.elf --eboot=eboot.bin --paid 0x3800000000000011
+	test -s eboot.bin
 
 # 3. تجهيز ملفات النظام الخاصة بالـ PKG (param.sfo)
 param.sfo:
@@ -50,7 +50,7 @@ param.sfo:
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo TITLE_ID --type Utf8 --maxsize 12 --value "$(TITLE_ID)"
 	$(PKG_TOOL) sfo_setentry sce_sys/param.sfo VERSION --type Utf8 --maxsize 8 --value $(VERSION)
 
-# 4. توليد project.gp4 مباشرة وبناء ملف PKG النهائي
+# 4. بناء ملف PKG النهائي
 G29_GTA5_Installer.pkg: G29_GTA5.prx eboot.bin param.sfo
 	printf '<?xml version="1.0" encoding="utf-8" standalone="yes"?>\n' > project.gp4
 	printf '<psproject fmt="gp4" version="1000">\n' >> project.gp4
