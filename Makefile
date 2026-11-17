@@ -19,12 +19,12 @@ LDFLAGS   := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x \
 
 all: G29_GTA5.prx G29_GTA5_Installer.pkg
 
-# 1. بناء ملف الإضافة البرمجية (PRX) الخاصة بـ GoldHEN
+# 1. بناء ملف الإضافة البرمجية (PRX) الخاصة بـ GoldHEN مع pthread و module_start
 G29_GTA5.prx: plugin.c
 	$(CC) $(CFLAGS) -c plugin.c -o plugin.o
 	$(LD) -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr \
-		-L$(TOOLCHAIN)/lib $(TOOLCHAIN)/lib/crtlib.o plugin.o \
-		-lkernel -lc -lScePad -o G29_GTA5.elf
+		-e module_start -L$(TOOLCHAIN)/lib $(TOOLCHAIN)/lib/crtlib.o plugin.o \
+		-lkernel -lc -lpthread -lScePad -o G29_GTA5.elf
 	$(TOOLCHAIN)/bin/linux/create-fself -in=G29_GTA5.elf --lib=G29_GTA5.prx --paid 0x3800000000000011
 	ls -lh G29_GTA5.prx
 	test -s G29_GTA5.prx
