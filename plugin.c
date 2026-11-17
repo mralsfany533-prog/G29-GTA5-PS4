@@ -2,14 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
 #include <pthread.h>
 #include <sys/mman.h>
 #include <orbis/libkernel.h>
 #include <orbis/Pad.h>
 
-#define STEERING_DEADZONE   4
-#define STEERING_GAIN       1.65f
-#define PEDAL_THRESHOLD     12
+// ============================================================================
+// 1. إعدادات القيادة الاحترافية لدركسون Logitech G29
+// ============================================================================
+#define STEERING_DEADZONE    3       // منطقة ميتة دقيقة لمنع اهتزاز السيارة
+#define STEERING_SENSITIVITY 1.45f   // معامل الاستجابة الأساسي
+#define STEERING_CURVE       1.25f   // نعومة المنتصف وسرعة الزوايا الحادة
+#define PEDAL_DEADZONE       10      // حساسية بداية دعسة البنزين والفرامل
 
 typedef int (*scePadReadState_t)(int32_t handle, OrbisPadData *data);
 static scePadReadState_t orig_scePadReadState = NULL;
@@ -17,6 +22,10 @@ static scePadReadState_t orig_scePadReadState = NULL;
 static uint8_t orig_bytes[16];
 static void *target_func_addr = NULL;
 static int hook_installed = 0;
+
+// متغيرات نظام مثبت السرعة (Cruise Control)
+static int cruise_active = 0;
+static int l3_was_pressed = 0;
 
 static void sendNotification(const char *msg) {
     OrbisNotificationRequest req;
@@ -29,27 +38,87 @@ static void sendNotification(const char *msg) {
     sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
 }
 
-static inline uint8_t processSteering(uint8_t rawX) {
+// ============================================================================
+// 2. معادلة الالتفاف المتدرج (تحاكي مود Manual Transmission على PC)
+// ============================================================================
+static inline uint8_t processAdvancedSteering(uint8_t rawX) {
     int offset = (int)rawX - 128;
-    if (abs(offset) < STEERING_DEADZONE) return 128;
-    int scaled = 128 + (int)(offset * STEERING_GAIN);
-    if (scaled > 255) scaled = 255;
-    if (scaled < 0)   scaled = 0;
-    return (uint8_t)scaled;
+    if (abs(offset) <= STEERING_DEADZONE) {
+        return 128;
+    }
+
+    // تحويل القيمة لنطاق [-1.0 إلى 1.0]
+    float norm = (float)offset / 127.0f;
+    float sign = (norm < 0.0f) ? -1.0f : 1.0f;
+    float abs_norm = fabsf(norm);
+
+    // تطبيق منحنى الاستجابة المتدرج + التضخيم
+    float curved = powf(abs_norm, STEERING_CURVE) * STEERING_SENSITIVITY;
+    if (curved > 1.0f) curved = 1.0f;
+
+    int final_val = 128 + (int)(sign * curved * 127.0f);
+    if (final_val > 255) final_val = 255;
+    if (final_val < 0)   final_val = 0;
+
+    return (uint8_t)final_val;
 }
 
-static void applyG29Remapping(OrbisPadData *data) {
+// ============================================================================
+// 3. تطبيق كافة تحسينات القيادة والدواسات والأزرار
+// ============================================================================
+static void applyProDrivingEnhancements(OrbisPadData *data) {
     if (!data || !data->connected) return;
-    data->leftStick.x = processSteering(data->leftStick.x);
-    if (abs((int)data->leftStick.y - 128) < 15) data->leftStick.y = 128;
 
-    if (data->analogButtons.r2 > PEDAL_THRESHOLD) data->buttons |= ORBIS_PAD_BUTTON_R2;
-    else data->buttons &= ~ORBIS_PAD_BUTTON_R2;
+    // 1. الالتفاف المتدرج الناعم
+    data->leftStick.x = processAdvancedSteering(data->leftStick.x);
 
-    if (data->analogButtons.l2 > PEDAL_THRESHOLD) data->buttons |= ORBIS_PAD_BUTTON_L2;
-    else data->buttons &= ~ORBIS_PAD_BUTTON_L2;
+    // 2. تثبيت المحور العمودي للعصا اليسرى لمنع اهتزاز السيارة/الدراجة
+    if (abs((int)data->leftStick.y - 128) < 20) {
+        data->leftStick.y = 128;
+    }
+
+    // 3. منع اهتزاز الكاميرا (Right Stick) بالخطأ
+    if (abs((int)data->rightStick.x - 128) < 12) data->rightStick.x = 128;
+    if (abs((int)data->rightStick.y - 128) < 12) data->rightStick.y = 128;
+
+    // 4. نظام مثبت السرعة (زر L3 لتفعيل/إلغاء، والفرامل تفصله تلقائياً)
+    int l3_now = (data->buttons & ORBIS_PAD_BUTTON_L3) ? 1 : 0;
+    if (l3_now && !l3_was_pressed) {
+        cruise_active = !cruise_active;
+        sendNotification(cruise_active ? "Cruise Control: ON" : "Cruise Control: OFF");
+    }
+    l3_was_pressed = l3_now;
+
+    // فصل مثبت السرعة فور الضغط على الفرامل
+    if (data->analogButtons.l2 > PEDAL_DEADZONE) {
+        cruise_active = 0;
+    }
+
+    // 5. معالجة دواسة البنزين (R2) والفرامل (L2)
+    if (cruise_active) {
+        data->analogButtons.r2 = 190; // سرعة ثابتة متوسطة مريحة
+        data->buttons |= ORBIS_PAD_BUTTON_R2;
+    } else if (data->analogButtons.r2 > PEDAL_DEADZONE) {
+        data->buttons |= ORBIS_PAD_BUTTON_R2;
+    } else {
+        data->buttons &= ~ORBIS_PAD_BUTTON_R2;
+    }
+
+    if (data->analogButtons.l2 > PEDAL_DEADZONE) {
+        data->buttons |= ORBIS_PAD_BUTTON_L2;
+    } else {
+        data->buttons &= ~ORBIS_PAD_BUTTON_L2;
+    }
+
+    // 6. تسهيل الدريفت: الشفرة اليسرى (L1) تعمل كفرامل يدوية سريعة الاستجابة
+    if (data->buttons & ORBIS_PAD_BUTTON_L1) {
+        data->buttons |= ORBIS_PAD_BUTTON_R1;
+    }
 }
 
+// ============================================================================
+// 4. الدالة البديلة وحقن الذاكرة
+// ============================================================================
 int hooked_scePadReadState(int32_t handle, OrbisPadData *data) {
     memcpy(target_func_addr, orig_bytes, 14);
     int ret = orig_scePadReadState(handle, data);
@@ -58,7 +127,10 @@ int hooked_scePadReadState(int32_t handle, OrbisPadData *data) {
     *(uint64_t *)(jump + 6) = (uint64_t)hooked_scePadReadState;
     memcpy(target_func_addr, jump, 14);
 
-    if (ret == 0 && data != NULL) applyG29Remapping(data);
+    if (ret == 0 && data != NULL) {
+        applyProDrivingEnhancements(data);
+    }
+
     return ret;
 }
 
@@ -92,7 +164,7 @@ static void *init_thread(void *arg) {
     sceKernelUsleep(1000000);
     int status = installPadHook();
     if (status == 0) {
-        sendNotification("G29 Wheel Active! Enjoy GTA V.");
+        sendNotification("G29 Pro Mode Active! (L3 = Cruise)");
     } else {
         char err[64];
         snprintf(err, sizeof(err), "G29 Hook Error: %d", status);
